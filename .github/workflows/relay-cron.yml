@@ -1,0 +1,14 @@
+name: relay-cron
+on:
+  schedule:
+    # JST=UTC+9 → 10:00, 17:00, 21:00 JST
+    - cron: "0 1 * * *"
+    - cron: "0 8 * * *"
+    - cron: "0 12 * * *"
+  workflow_dispatch:
+jobs:
+  trigger-render:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Render Deploy Hook
+        run: curl -sS -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"

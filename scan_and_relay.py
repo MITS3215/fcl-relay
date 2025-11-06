@@ -68,8 +68,6 @@ async def relay_once():
 
         embed = discord.Embed(description=body)
         embed.set_author(name="FCL｜公式通知")
-        # 元メッセージURLをフッターに入れて出所を残す
-        embed.set_footer(text=f"from #{inbox.name} / {msg.jump_url}")
 
         await target.send(embed=embed)
         try:

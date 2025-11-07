@@ -1,14 +1,22 @@
 name: relay-cron
 on:
   schedule:
-    # JST=UTC+9 → 10:00, 17:00, 21:00 JST
-    - cron: "0 1 * * *"
-    - cron: "0 8 * * *"
-    - cron: "0 12 * * *"
+    # JST=UTC+9
+    - cron: "0 1 * * *"    # 10:00
+    - cron: "15 1 * * *"   # 10:15 フォールバック
+    - cron: "0 8 * * *"    # 17:00
+    - cron: "15 8 * * *"   # 17:15 フォールバック
+    - cron: "0 12 * * *"   # 21:00
+    - cron: "15 12 * * *"  # 21:15 フォールバック
   workflow_dispatch:
+
+concurrency:
+  group: relay-cron
+  cancel-in-progress: true  # 遅延で重なっても1本に束ねる
+
 jobs:
   trigger-render:
     runs-on: ubuntu-latest
     steps:
       - name: Call Render Deploy Hook
-        run: curl -sS -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"
+        run: curl -sS --retry 3 -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"

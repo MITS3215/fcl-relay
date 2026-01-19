@@ -12,11 +12,31 @@ on:
 
 concurrency:
   group: relay-cron
-  cancel-in-progress: true  # 遅延で重なっても1本に束ねる
+  cancel-in-progress: true
 
 jobs:
-  trigger-render:
+  relay:
     runs-on: ubuntu-latest
     steps:
-      - name: Call Render Deploy Hook
-        run: curl -sS --retry 3 -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: |
+          python -m pip install -U pip
+          pip install -U discord.py aiohttp
+
+      - name: Run relay
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          GUILD_ID: ${{ secrets.GUILD_ID }}
+          INBOX_CHANNEL_ID: ${{ secrets.INBOX_CHANNEL_ID }}
+          CH_NEWS_ID: ${{ secrets.CH_NEWS_ID }}
+          CH_EVENT_ID: ${{ secrets.CH_EVENT_ID }}
+          CH_SEMINAR_ID: ${{ secrets.CH_SEMINAR_ID }}
+          CH_TIPS_ID: ${{ secrets.CH_TIPS_ID }}
+          LOOKBACK_HOURS: "12"
+        run: python scan_and_relay.py

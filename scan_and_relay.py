@@ -92,7 +92,6 @@ async def relay_once():
         # ---- Embed作成 ----
         embeds = []
         base = discord.Embed(description=body)
-        base.set_author(name="FCL｜公式通知")
 
         if image_urls:
             # 1つ目はbaseに表示

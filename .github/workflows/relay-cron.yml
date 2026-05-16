@@ -31,12 +31,9 @@ jobs:
 
       - name: Run relay
         env:
-          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
-          GUILD_ID: ${{ secrets.GUILD_ID }}
-          INBOX_CHANNEL_ID: ${{ secrets.INBOX_CHANNEL_ID }}
-          CH_NEWS_ID: ${{ secrets.CH_NEWS_ID }}
-          CH_EVENT_ID: ${{ secrets.CH_EVENT_ID }}
-          CH_SEMINAR_ID: ${{ secrets.CH_SEMINAR_ID }}
-          CH_TIPS_ID: ${{ secrets.CH_TIPS_ID }}
+          DISCORD_BOT_TOKEN: "${{ secrets.DISCORD_BOT_TOKEN }}"
+          GUILD_ID: "${{ secrets.GUILD_ID }}"
+          INBOX_CHANNEL_ID: "${{ secrets.INBOX_CHANNEL_ID }}"
+          CH_TIKTOK_INFO_ID: "${{ secrets.CH_TIKTOK_INFO_ID }}"
           LOOKBACK_HOURS: "12"
         run: python scan_and_relay.py

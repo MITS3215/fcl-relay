@@ -1,37 +1,58 @@
 # scan_and_relay.py
-import os, re, asyncio, datetime as dt
+import os
+import re
+import datetime as dt
 import discord
 
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 GUILD_ID = int(os.getenv("GUILD_ID"))
 INBOX_CHANNEL_ID = int(os.getenv("INBOX_CHANNEL_ID"))
-
-ROUTES = {
-    "news":    int(os.getenv("CH_NEWS_ID", "0")),
-    "event":   int(os.getenv("CH_EVENT_ID", "0")),
-    "seminar": int(os.getenv("CH_SEMINAR_ID", "0")),
-    "tips":    int(os.getenv("CH_TIPS_ID", "0")),
-}
-
-CATEGORY_RE = re.compile(r"^\s*#category:\s*([a-z_]+)\s*$", re.I)
+CH_TIKTOK_INFO_ID = int(os.getenv("CH_TIKTOK_INFO_ID", "0"))
 LOOKBACK_HOURS = int(os.getenv("LOOKBACK_HOURS", "12"))
+
+# 旧運用の category 行が残っていた場合は、再投稿時に削除する
+CATEGORY_LINE_RE = re.compile(r"^\s*#category:\s*[a-z_]+\s*$", re.I)
 
 intents = discord.Intents.default()
 intents.message_content = True
 client = discord.Client(intents=intents)
 
+
 def is_image(att: discord.Attachment) -> bool:
     ct = (att.content_type or "").lower()
     if ct.startswith("image/"):
         return True
+
     name = (att.filename or "").lower()
     return name.endswith((".png", ".jpg", ".jpeg", ".gif", ".webp"))
 
+
+def clean_body(content: str) -> str:
+    """
+    告知メモ本文を再投稿用に整える。
+    旧運用の #category: xxx 行が残っていれば削除。
+    """
+    lines = content.splitlines()
+    cleaned = [line for line in lines if not CATEGORY_LINE_RE.match(line)]
+    body = "\n".join(cleaned).strip()
+    return body or "(本文なし)"
+
+
 async def relay_once():
     guild = client.get_guild(GUILD_ID)
+    if not guild:
+        print("GUILD not found")
+        return
+
     inbox = guild.get_channel(INBOX_CHANNEL_ID)
     if not inbox:
-        print("INBOX not found"); return
+        print("INBOX not found")
+        return
+
+    target = guild.get_channel(CH_TIKTOK_INFO_ID)
+    if not target:
+        print("TIKTOK INFO channel not found")
+        return
 
     after = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=LOOKBACK_HOURS)
     count_scanned = 0
@@ -39,6 +60,8 @@ async def relay_once():
 
     async for msg in inbox.history(limit=500, after=after, oldest_first=True):
         count_scanned += 1
+
+        # Bot投稿は処理しない
         if msg.author.bot:
             continue
 
@@ -46,41 +69,22 @@ async def relay_once():
         if any(r.emoji == "✅" for r in msg.reactions):
             continue
 
-        lines = msg.content.splitlines()
-        if not lines:
-            continue
+        body = clean_body(msg.content)
 
-        m = CATEGORY_RE.match(lines[0])
-        if not m:
-            continue
-
-        cat = m.group(1).lower().strip()
-        target_id = ROUTES.get(cat, 0)
-        if not target_id:
-            try: await msg.add_reaction("❗")
-            except: pass
-            continue
-
-        body = "\n".join(lines[1:]).strip()
-        if not body:
-            body = "(本文なし)"
-
-        target = guild.get_channel(target_id)
-        if not target:
-            try: await msg.add_reaction("❗")
-            except: pass
+        # 本文も添付もない場合はスキップ
+        if body == "(本文なし)" and not msg.attachments:
             continue
 
         # ---- 添付（画像/非画像）を拾う ----
         image_urls = []
         other_urls = []
+
         for att in msg.attachments:
             if is_image(att):
                 image_urls.append(att.url)
             else:
                 other_urls.append(att.url)
 
-        # 本文末尾に「添付リンク」を付ける（画像も上限超え分はここに落とす）
         tail_lines = []
         if other_urls:
             tail_lines.append("添付: " + " ".join(other_urls))
@@ -109,30 +113,30 @@ async def relay_once():
             embeds.append(base)
 
         if tail_lines:
-            # descriptionの末尾に追記（長すぎる場合は切る）
             extra = "\n\n" + "\n".join(tail_lines)
-            # Embed descriptionは上限があるので安全側に
             new_desc = (embeds[0].description or "") + extra
             embeds[0].description = new_desc[:3800]
 
-        # 送信（複数embed対応）
+        # 送信
         await target.send(embeds=embeds)
 
         # 処理済みマーク
         try:
             await msg.add_reaction("✅")
-        except:
-            pass
+        except Exception as e:
+            print(f"failed to add reaction: {e}")
 
         count_posted += 1
 
     print(f"scanned={count_scanned}, posted={count_posted}")
+
 
 @client.event
 async def on_ready():
     try:
         await relay_once()
     finally:
-        await client.close()  # 終了（無料枠にやさしい）
+        await client.close()
+
 
 client.run(TOKEN)
